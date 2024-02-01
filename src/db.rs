@@ -11,12 +11,6 @@ pub struct Event {
     from :String,
 }
 
-#[allow(clippy::enum_variant_names)]
-pub enum Execute{
-    FetchEvent(Option<String>),
-    PushEvent(Event),
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Types {
     CREATE,
@@ -42,51 +36,58 @@ impl Types {
     }
 }
 
-pub async fn fetch_event(pool: &SqlitePool, last_sync_date: Option<String>) -> Result<Vec<Event>, anyhow::Error> {
-    //     let stmt= match last_sync_date {
-    //         Some(date) => format!("
-    // SELECT name, date, type as event_type, content, from_client
-    //     FROM events
-    //     WHERE date > '{}'
-    //     ORDER BY date ASC LIMIT 10", date).as_str(),
-    //         None => r#"
-    // SELECT name, date, type as event_type, content, from_client
-    //     FROM events
-    //     ORDER BY date ASC LIMIT 10"#,
-    //     };
-
-        struct Row {
-            name :String,
-            date :String,
-            event_type :String,
-            content :String,
-            from_client :String, 
+        struct EventRow {
+            name: String,
+            date: String,
+            event_type: String,
+            content: String,
+            from_client: String,
         }
-
-        let result :Vec<Row> = sqlx::query_as!(
-            Row,
-            r#"
+pub async fn fetch_all_event_stmt(pool: &SqlitePool) -> Result<Vec<EventRow>, sqlx::Error>{
+    sqlx::query_as!(
+        EventRow,
+        r#"
     SELECT name, date, type as event_type, content, from_client
         FROM events
         ORDER BY date ASC LIMIT 10"#,
-            // stmt,
-        )
-        .fetch_all(pool)
-        .await?;
-        // for (idx, row) in result.iter().enumerate(){
-            // println!("{}", row.get("name"))
-        // }
-        let events = result
-        .into_iter()
-        .filter_map(|row: Row| {
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn fetch_event_by_date_stmt(pool: &SqlitePool, last_sync_date: Option<String>) -> Result<Vec<EventRow>, sqlx::Error>{
+    let date =  match last_sync_date {
+        Some(date)=>date,
+        None => "".to_string(),
+    };
+    sqlx::query_as!(
+        EventRow,
+        r#"
+    SELECT name, date, type as event_type, content, from_client
+        FROM events
+        WHERE date > ?
+        ORDER BY date ASC LIMIT 10"#,
+        date,
+    )
+    .fetch_all(pool)
+    .await
+}
+
+
+
+pub async fn fetch_event(pool: &SqlitePool, last_sync_date: Option<String>) -> Result<Vec<Event>, anyhow::Error> {
+        let events = fetch_event_by_date_stmt(pool, last_sync_date)
+        .await?
+        .iter()
+        .filter_map(|row: &EventRow| {
             match Types::parse(row.event_type.as_str()){
                 Ok(event_type) => Some(
             Event{
-                name: row.name,
-                date: row.date,
+                name: row.name.clone(),
+                date: row.date.clone(),
                 event_type: event_type,
-                content: row.content,
-                from: row.from_client,
+                content: row.content.clone(),
+                from: row.from_client.clone(),
             } 
                 ),
                 Err(error)=>{
