@@ -41,16 +41,22 @@ impl ResponseError for SecretError {
 }
 
 #[derive(serde::Deserialize)]
-pub struct FetchParam{
-    last_sync_date: Option<String>
+pub struct FetchParam {
+    last_sync_date: Option<String>,
 }
 
-async fn fetch(parameters: web::Query<FetchParam>, db: web::Data<SqlitePool>) -> Result<HttpResponse, SecretError> {
+async fn fetch(
+    parameters: web::Query<FetchParam>,
+    db: web::Data<SqlitePool>,
+) -> Result<HttpResponse, SecretError> {
     let result = db::fetch_event(&db, parameters.last_sync_date.to_owned()).await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
-async fn push_event(event: web::Json<Event>, db: web::Data<SqlitePool>) -> Result<HttpResponse, SecretError> {
+async fn push_event(
+    event: web::Json<Event>,
+    db: web::Data<SqlitePool>,
+) -> Result<HttpResponse, SecretError> {
     let result = db::push_event(&db, event.0).await?;
 
     Ok(HttpResponse::Ok().json(result))
@@ -66,7 +72,7 @@ async fn main() -> io::Result<()> {
         Sqlite::create_database(&db_url).await.unwrap();
         match cretea_schema(&db_url).await {
             Ok(_) => println!("Database created Sucessfully"),
-            Err(e) => panic!("{}",e),
+            Err(e) => panic!("{}", e),
         }
     }
 
@@ -88,10 +94,9 @@ async fn main() -> io::Result<()> {
     .await
 }
 
-async fn cretea_schema(db_url:&str) -> Result<SqliteQueryResult, sqlx::Error> {
+async fn cretea_schema(db_url: &str) -> Result<SqliteQueryResult, sqlx::Error> {
     let pool = SqlitePool::connect(&db_url).await?;
-    let qry = 
-    "CREATE TABLE IF NOT EXISTS events
+    let qry = "CREATE TABLE IF NOT EXISTS events
         (
             name TEXT NOT NULL,
             date TEXT PRIMARY KEY     NOT NULL,,
@@ -99,7 +104,7 @@ async fn cretea_schema(db_url:&str) -> Result<SqliteQueryResult, sqlx::Error> {
             content TEXT NOT NULL,
             from TEXT NOT NULL,
         );";
-    let result = sqlx::query(&qry).execute(&pool).await;   
-    pool.close().await; 
+    let result = sqlx::query(&qry).execute(&pool).await;
+    pool.close().await;
     return result;
 }
