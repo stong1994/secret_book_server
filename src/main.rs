@@ -1,8 +1,9 @@
 use std::io;
 
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
+use db::Event;
 use reqwest::StatusCode;
-use sqlx::{sqlite::SqliteQueryResult, SqlitePool};
+use sqlx::{migrate::MigrateDatabase, sqlite::SqliteQueryResult, Sqlite, SqlitePool};
 
 mod db;
 
@@ -49,6 +50,11 @@ async fn fetch(parameters: web::Query<FetchParam>, db: web::Data<SqlitePool>) ->
 
     Ok(HttpResponse::Ok().json(result))
 }
+async fn push_event(event: web::Json<Event>, db: web::Data<SqlitePool>) -> Result<HttpResponse, SecretError> {
+    let result = db::push_event(&db, event.0).await?;
+
+    Ok(HttpResponse::Ok().json(result))
+}
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
@@ -56,13 +62,13 @@ async fn main() -> io::Result<()> {
 
     // connect to SQLite DB
     let db_url = String::from("sqlite://db/secret.db");
-    // if !Sqlite::database_exists(&db_url).await.unwrap_or(false) {
-    //     Sqlite::create_database(&db_url).await.unwrap();
-    //     match cretea_schema(&db_url).await {
-    //         Ok(_) => println!("Database created Sucessfully"),
-    //         Err(e) => panic!("{}",e),
-    //     }
-    // }
+    if !Sqlite::database_exists(&db_url).await.unwrap_or(false) {
+        Sqlite::create_database(&db_url).await.unwrap();
+        match cretea_schema(&db_url).await {
+            Ok(_) => println!("Database created Sucessfully"),
+            Err(e) => panic!("{}",e),
+        }
+    }
 
     let pool = SqlitePool::connect(&db_url).await.unwrap();
     // log::info!("starting HTTP server at http://localhost:12345");
@@ -73,8 +79,8 @@ async fn main() -> io::Result<()> {
             // store db pool as Data object
             .app_data(web::Data::new(pool.clone()))
             .wrap(middleware::Logger::default())
-            .service(web::resource("/fetch").route(web::get().to(fetch)))
-            // .service(web::resource("/push").route(web::post().to(parallel_weather)))
+            .route("/fetch", web::get().to(fetch))
+            .route("/push", web::post().to(push_event))
     })
     .bind(("127.0.0.1", 12345))?
     .workers(2)
