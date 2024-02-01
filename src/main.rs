@@ -3,7 +3,7 @@ use std::io;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
 use db::Event;
 use reqwest::StatusCode;
-use sqlx::{migrate::MigrateDatabase, sqlite::SqliteQueryResult, Sqlite, SqlitePool};
+use sqlx::SqlitePool;
 
 mod db;
 
@@ -68,13 +68,6 @@ async fn main() -> io::Result<()> {
 
     // connect to SQLite DB
     let db_url = String::from("sqlite://db/secret.db");
-    if !Sqlite::database_exists(&db_url).await.unwrap_or(false) {
-        Sqlite::create_database(&db_url).await.unwrap();
-        match cretea_schema(&db_url).await {
-            Ok(_) => println!("Database created Sucessfully"),
-            Err(e) => panic!("{}", e),
-        }
-    }
 
     let pool = SqlitePool::connect(&db_url).await.unwrap();
     // log::info!("starting HTTP server at http://localhost:12345");
@@ -92,19 +85,4 @@ async fn main() -> io::Result<()> {
     .workers(2)
     .run()
     .await
-}
-
-async fn cretea_schema(db_url: &str) -> Result<SqliteQueryResult, sqlx::Error> {
-    let pool = SqlitePool::connect(&db_url).await?;
-    let qry = "CREATE TABLE IF NOT EXISTS events
-        (
-            name TEXT NOT NULL,
-            date TEXT PRIMARY KEY     NOT NULL,,
-            type TEXT NOT NUL,
-            content TEXT NOT NULL,
-            from TEXT NOT NULL,
-        );";
-    let result = sqlx::query(&qry).execute(&pool).await;
-    pool.close().await;
-    return result;
 }
