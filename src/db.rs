@@ -6,6 +6,7 @@ pub struct Event {
     name: String,
     date: String,
     event_type: Types,
+    data_type: String,
     content: String,
     from: String,
 }
@@ -49,6 +50,7 @@ struct EventRow {
     name: String,
     date: String,
     event_type: String,
+    data_type: String,
     content: String,
     from_client: String,
 }
@@ -64,7 +66,7 @@ async fn fetch_event_by_date_stmt(
     sqlx::query_as!(
         EventRow,
         r#"
-    SELECT name, date, type as event_type, content, from_client
+    SELECT name, date, event_type, data_type, content, from_client
         FROM events
         WHERE date > ?
         ORDER BY date ASC LIMIT 10"#,
@@ -87,6 +89,7 @@ pub async fn fetch_event(
                     name: row.name.clone(),
                     date: row.date.clone(),
                     event_type: event_type,
+                    data_type: row.data_type.clone(),
                     content: row.content.clone(),
                     from: row.from_client.clone(),
                 }),
@@ -105,11 +108,12 @@ pub async fn fetch_event(
 pub async fn push_event(pool: &SqlitePool, event: Event) -> Result<(), anyhow::Error> {
     let event_type = event.event_type.as_str();
     sqlx::query!(
-        r#"INSERT INTO events(name, date, type, content, from_client)
-        VALUES ($1,$2,$3,$4,$5)"#,
+        r#"INSERT INTO events(name, date, event_type, data_type, content, from_client)
+        VALUES ($1,$2,$3,$4,$5,$6)"#,
         event.name,
         event.date,
         event_type,
+        event.data_type,
         event.content,
         event.from,
     )
