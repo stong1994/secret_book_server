@@ -3,6 +3,7 @@ use sqlx::SqlitePool;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
+    id: String,
     name: String,
     date: String,
     event_type: Types,
@@ -47,6 +48,7 @@ impl<'de> Deserialize<'de> for Types {
 }
 
 struct EventRow {
+    id: String,
     name: String,
     date: String,
     event_type: String,
@@ -66,7 +68,7 @@ async fn fetch_event_by_date_stmt(
     sqlx::query_as!(
         EventRow,
         r#"
-    SELECT name, date, event_type, data_type, content, from_client
+    SELECT id, name, date, event_type, data_type, content, from_client
         FROM events
         WHERE date > ?
         ORDER BY date ASC LIMIT 10"#,
@@ -86,6 +88,7 @@ pub async fn fetch_event(
         .filter_map(|row: &EventRow| {
             match Types::parse(row.event_type.as_str()) {
                 Ok(event_type) => Some(Event {
+                    id: row.id.clone(),
                     name: row.name.clone(),
                     date: row.date.clone(),
                     event_type: event_type,
@@ -108,8 +111,9 @@ pub async fn fetch_event(
 pub async fn push_event(pool: &SqlitePool, event: Event) -> Result<(), anyhow::Error> {
     let event_type = event.event_type.as_str();
     sqlx::query!(
-        r#"INSERT INTO events(name, date, event_type, data_type, content, from_client)
-        VALUES ($1,$2,$3,$4,$5,$6)"#,
+        r#"INSERT INTO events(id, name, date, event_type, data_type, content, from_client)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)"#,
+        event.id,
         event.name,
         event.date,
         event_type,

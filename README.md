@@ -9,5 +9,5 @@ cd db && sh setup_db.sh && cd -
 
 ## 2. Run
 ```
-cargo runs
+cargo run
 ```
