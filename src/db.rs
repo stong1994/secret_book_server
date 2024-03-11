@@ -1,5 +1,7 @@
+use log::{error, info};
 use serde::{Deserialize, Deserializer, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{sqlite::SqliteQueryResult, SqlitePool};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -109,11 +111,12 @@ pub async fn fetch_event(
 }
 
 pub async fn push_event(pool: &SqlitePool, event: Event) -> Result<(), anyhow::Error> {
+    let id = Uuid::new_v4().to_string();
     let event_type = event.event_type.as_str();
-    sqlx::query!(
+    let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
         r#"INSERT INTO events(id, name, date, event_type, data_type, content, from_client)
         VALUES ($1,$2,$3,$4,$5,$6,$7)"#,
-        event.id,
+        id,
         event.name,
         event.date,
         event_type,
@@ -122,7 +125,12 @@ pub async fn push_event(pool: &SqlitePool, event: Event) -> Result<(), anyhow::E
         event.from,
     )
     .execute(pool)
-    .await?;
+    .await;
+    if rst.is_err() {
+        let e = rst.unwrap_err();
+        error!("Error inserting event into the database: {}", e);
+        return Err(e.into());
+    }
     Ok(())
 }
 

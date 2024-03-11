@@ -10,6 +10,7 @@ actix-web = "4"
 anyhow = "1.0.79"
 env_logger = "0.11.1"
 futures = "0.3.30"
+log = "0.4.21"
 reqwest = "0.11.24"
 
 # r2d2 = "0.8"
@@ -17,6 +18,13 @@ reqwest = "0.11.24"
 serde = { version = "1.0.193" , features = ["derive"]}
 thiserror = "1.0.56"
 tokio = "1.35.1"
+[dependencies.uuid]
+version = "1.7.0"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
 [dependencies.sqlx]
 version = "0.5.7"
 default-features = false
