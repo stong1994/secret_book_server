@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::error;
 use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::{sqlite::SqliteQueryResult, SqlitePool};
 use uuid::Uuid;
@@ -12,6 +12,7 @@ pub struct Event {
     data_id: String,
     data_type: String,
     content: String,
+    desc: String,
     from: String,
 }
 
@@ -58,60 +59,61 @@ struct EventRow {
     data_id: String,
     data_type: String,
     content: String,
+    desc: String,
     from_client: String,
 }
 
-async fn fetch_event_by_date_stmt(
-    pool: &SqlitePool,
-    last_sync_date: Option<String>,
-) -> Result<Vec<EventRow>, sqlx::Error> {
-    let date = match last_sync_date {
-        Some(date) => date,
-        None => "".to_string(),
-    };
-    sqlx::query_as!(
-        EventRow,
-        r#"
-    SELECT id, name, date, event_type, data_id, data_type, content, from_client
-        FROM events
-        WHERE date > ?
-        ORDER BY date ASC LIMIT 10"#,
-        date,
-    )
-    .fetch_all(pool)
-    .await
-}
-
-pub async fn fetch_event(
-    pool: &SqlitePool,
-    last_sync_date: Option<String>,
-) -> Result<Vec<Event>, anyhow::Error> {
-    let events = fetch_event_by_date_stmt(pool, last_sync_date)
-        .await?
-        .iter()
-        .filter_map(|row: &EventRow| {
-            match Types::parse(row.event_type.as_str()) {
-                Ok(event_type) => Some(Event {
-                    id: row.id.clone(),
-                    name: row.name.clone(),
-                    date: row.date.clone(),
-                    event_type: event_type,
-                    data_id: row.data_id.clone(),
-                    data_type: row.data_type.clone(),
-                    content: row.content.clone(),
-                    from: row.from_client.clone(),
-                }),
-                Err(_error) => {
-                    // todo log
-
-                    None
-                }
-            }
-        })
-        .collect();
-
-    Ok(events)
-}
+// async fn fetch_event_by_date_stmt(
+//     pool: &SqlitePool,
+//     last_sync_date: Option<String>,
+// ) -> Result<Vec<EventRow>, sqlx::Error> {
+//     let date = match last_sync_date {
+//         Some(date) => date,
+//         None => "".to_string(),
+//     };
+//     sqlx::query_as!(
+//         EventRow,
+//         r#"
+//     SELECT id, name, date, event_type, data_id, data_type, content, from_client
+//         FROM events
+//         WHERE date > ?
+//         ORDER BY date ASC LIMIT 10"#,
+//         date,
+//     )
+//     .fetch_all(pool)
+//     .await
+// }
+//
+// pub async fn fetch_event(
+//     pool: &SqlitePool,
+//     last_sync_date: Option<String>,
+// ) -> Result<Vec<Event>, anyhow::Error> {
+//     let events = fetch_event_by_date_stmt(pool, last_sync_date)
+//         .await?
+//         .iter()
+//         .filter_map(|row: &EventRow| {
+//             match Types::parse(row.event_type.as_str()) {
+//                 Ok(event_type) => Some(Event {
+//                     id: row.id.clone(),
+//                     name: row.name.clone(),
+//                     date: row.date.clone(),
+//                     event_type: event_type,
+//                     data_id: row.data_id.clone(),
+//                     data_type: row.data_type.clone(),
+//                     content: row.content.clone(),
+//                     from: row.from_client.clone(),
+//                 }),
+//                 Err(_error) => {
+//                     // todo log
+//
+//                     None
+//                 }
+//             }
+//         })
+//         .collect();
+//
+//     Ok(events)
+// }
 
 pub async fn push_event(pool: &SqlitePool, event: Event) -> Result<(), anyhow::Error> {
     let state = save_state(pool, event.clone()).await?;
@@ -119,12 +121,16 @@ pub async fn push_event(pool: &SqlitePool, event: Event) -> Result<(), anyhow::E
     Ok(())
 }
 
-pub async fn store_event(pool: &SqlitePool, event: Event, state: FinalState) -> Result<(), anyhow::Error> {
+pub async fn store_event(
+    pool: &SqlitePool,
+    event: Event,
+    state: FinalState,
+) -> Result<(), anyhow::Error> {
     let id = Uuid::new_v4().to_string();
     let event_type = event.event_type.as_str();
     let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
-        r#"INSERT INTO events(id, name, date, event_type, data_id, data_type, content, from_client)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)"#,
+        r#"INSERT INTO events(id, name, date, event_type, data_id, data_type, content, desc, from_client)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)"#,
         id,
         state.name,
         state.date,
@@ -132,6 +138,7 @@ pub async fn store_event(pool: &SqlitePool, event: Event, state: FinalState) -> 
         state.id,
         state.data_type,
         state.content,
+        state.desc,
         event.from,
     )
     .execute(pool)
@@ -164,19 +171,21 @@ pub struct FinalState {
     date: String,
     data_type: String,
     content: String,
+    desc: String,
 }
 
 pub async fn save_state(pool: &SqlitePool, event: Event) -> Result<FinalState, anyhow::Error> {
     match event.event_type {
         Types::CREATE => {
             let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
-                r#"INSERT INTO finalstates(id, name, date, data_type, content)
-                VALUES ($1,$2,$3,$4,$5)"#,
+                r#"INSERT INTO finalstates(id, name, date, data_type, content, desc)
+                VALUES ($1,$2,$3,$4,$5,$6)"#,
                 event.data_id,
                 event.name,
                 event.date,
                 event.data_type,
                 event.content,
+                event.desc,
             )
             .execute(pool)
             .await;
@@ -185,21 +194,23 @@ pub async fn save_state(pool: &SqlitePool, event: Event) -> Result<FinalState, a
                 error!("Error inserting event into the database: {}", e);
                 return Err(e.into());
             }
-            Ok(FinalState{
+            Ok(FinalState {
                 id: event.data_id,
                 name: event.name,
                 date: event.date,
                 data_type: event.data_type,
                 content: event.content,
+                desc: event.desc,
             })
         }
         Types::UPDATE => {
             let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
-                r#"UPDATE finalstates SET name = $1, date = $2, data_type = $3, content = $4 WHERE id = $5"#,
+                r#"UPDATE finalstates SET name = $1, date = $2, data_type = $3, content = $4, desc = $5 WHERE id = $6"#,
                 event.name,
                 event.date,
                 event.data_type,
                 event.content,
+                event.desc,
                 event.data_id,
             )
             .execute(pool)
@@ -209,32 +220,32 @@ pub async fn save_state(pool: &SqlitePool, event: Event) -> Result<FinalState, a
                 error!("Error updating event in the database: {}", e);
                 return Err(e.into());
             }
-            Ok(FinalState{
+            Ok(FinalState {
                 id: event.data_id,
                 name: event.name,
                 date: event.date,
                 data_type: event.data_type,
                 content: event.content,
+                desc: event.desc,
             })
         }
         Types::DELETE => {
-            let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
-                r#"DELETE FROM finalstates WHERE id = $1"#,
-                event.data_id,
-            )
-            .execute(pool)
-            .await;
+            let rst: Result<SqliteQueryResult, sqlx::Error> =
+                sqlx::query!(r#"DELETE FROM finalstates WHERE id = $1"#, event.data_id,)
+                    .execute(pool)
+                    .await;
             if rst.is_err() {
                 let e = rst.unwrap_err();
                 error!("Error deleting event from the database: {}", e);
                 return Err(e.into());
             }
-            Ok(FinalState{
+            Ok(FinalState {
                 id: event.id,
                 name: event.name,
                 date: event.date,
                 data_type: event.data_type,
                 content: event.content,
+                desc: event.desc,
             })
         }
     }
@@ -252,14 +263,44 @@ pub async fn fetch_states(
     let states = sqlx::query_as!(
         FinalState,
         r#"
-    SELECT id, name, date, data_type, content
+    SELECT id, name, date, data_type, content, desc
         FROM finalstates
         WHERE id > ? and data_type = ?
         ORDER BY id ASC LIMIT 10"#,
-        id, data_type
+        id,
+        data_type
     )
     .fetch_all(pool)
     .await?;
-        
+
+    Ok(states)
+}
+pub async fn fetch_state(
+    pool: &SqlitePool,
+    host: String,
+) -> Result<Vec<FinalState>, anyhow::Error> {
+    // Try to find states where name or desc contains the host
+    let host_like = format!("%{}%", host);
+    let mut states = sqlx::query_as!(
+        FinalState,
+        r#"
+    SELECT id, name, date, data_type, content, desc
+        FROM finalstates
+        WHERE name LIKE ? OR desc LIKE ?"#,
+        host_like,
+        host_like,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    // If no states found, try with parent domain
+    if states.is_empty() {
+        let parts: Vec<&str> = host.split('.').collect();
+        if parts.len() > 1 {
+            let parent_domain = parts[1..].join(".");
+            states = Box::pin(fetch_state(pool, parent_domain)).await?;
+        }
+    }
+
     Ok(states)
 }
