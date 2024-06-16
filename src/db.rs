@@ -176,9 +176,9 @@ pub struct FinalState {
 
 pub async fn save_state(pool: &SqlitePool, event: Event) -> Result<FinalState, anyhow::Error> {
     match event.event_type {
-        Types::CREATE => {
+        Types::CREATE | Types::UPDATE => {
             let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
-                r#"INSERT INTO finalstates(id, name, date, data_type, content, desc)
+                r#"INSERT OR REPLACE INTO finalstates(id, name, date, data_type, content, desc)
                 VALUES ($1,$2,$3,$4,$5,$6)"#,
                 event.data_id,
                 event.name,
@@ -191,33 +191,7 @@ pub async fn save_state(pool: &SqlitePool, event: Event) -> Result<FinalState, a
             .await;
             if rst.is_err() {
                 let e = rst.unwrap_err();
-                error!("Error inserting event into the database: {}", e);
-                return Err(e.into());
-            }
-            Ok(FinalState {
-                id: event.data_id,
-                name: event.name,
-                date: event.date,
-                data_type: event.data_type,
-                content: event.content,
-                desc: event.desc,
-            })
-        }
-        Types::UPDATE => {
-            let rst: Result<SqliteQueryResult, sqlx::Error> = sqlx::query!(
-                r#"UPDATE finalstates SET name = $1, date = $2, data_type = $3, content = $4, desc = $5 WHERE id = $6"#,
-                event.name,
-                event.date,
-                event.data_type,
-                event.content,
-                event.desc,
-                event.data_id,
-            )
-            .execute(pool)
-            .await;
-            if rst.is_err() {
-                let e = rst.unwrap_err();
-                error!("Error updating event in the database: {}", e);
+                error!("Error inserting or updating event in the database: {}", e);
                 return Err(e.into());
             }
             Ok(FinalState {
