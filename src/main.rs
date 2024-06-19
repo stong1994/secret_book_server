@@ -41,19 +41,6 @@ impl ResponseError for SecretError {
     }
 }
 
-#[derive(serde::Deserialize)]
-pub struct FetchEventParam {
-    last_sync_date: Option<String>,
-}
-
-// async fn fetch_events(
-//     parameters: web::Query<FetchEventParam>,
-//     db: web::Data<SqlitePool>,
-// ) -> Result<HttpResponse, SecretError> {
-//     let result = db::fetch_event(&db, parameters.last_sync_date.to_owned()).await?;
-//
-//     Ok(HttpResponse::Ok().json(result))
-// }
 async fn push_event(
     event: web::Json<Event>,
     db: web::Data<SqlitePool>,
@@ -62,7 +49,11 @@ async fn push_event(
 
     Ok(HttpResponse::Ok().json(result))
 }
+ async fn ping(
+) -> Result<HttpResponse, SecretError> {
 
+    Ok(HttpResponse::Ok().body("PONG"))
+}
 #[derive(serde::Deserialize)]
 pub struct FetchStatesParam {
     data_type: String,
@@ -95,8 +86,8 @@ async fn fetch_state(
 async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    // connect to SQLite DB
-    let db_url = String::from("sqlite://db/secret.db");
+    let db_url = std::env::var("SECRET_SERVER_DB_URL").unwrap_or("sqlite://db/secret.db".to_string());
+    println!("db_url: {}", db_url);
 
     let pool = SqlitePool::connect(&db_url).await.unwrap();
     // log::info!("starting HTTP server at http://localhost:12345");
@@ -118,9 +109,9 @@ async fn main() -> io::Result<()> {
             .route("/fetch_states", web::get().to(fetch_states))
             .route("/fetch_state", web::get().to(fetch_state))
             .route("/push", web::post().to(push_event))
+            .route("/ping", web::get().to(ping))
     })
-    .bind(("192.168.110.168", 12345))?
-    // .bind(("10.2.1.220", 12345))?
+    .bind(("localhost", 12345))?
     .workers(2)
     .run()
     .await

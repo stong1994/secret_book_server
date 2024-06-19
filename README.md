@@ -19,3 +19,17 @@ cargo run
 ```
 cd db && sh clean_db.sh && cd -
 ```
+
+## Install
+
+1. set db path
+
+```bash
+export SECRET_SERVER_DB_URL="/xxxxx/xxx.db"
+```
+
+2. run
+
+```bash
+./secret_book_server
+```
