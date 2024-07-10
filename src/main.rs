@@ -1,7 +1,7 @@
 use std::io;
 
+use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
- use actix_cors::Cors;
 use db::Event;
 use reqwest::StatusCode;
 use sqlx::SqlitePool;
@@ -49,9 +49,7 @@ async fn push_event(
 
     Ok(HttpResponse::Ok().json(result))
 }
- async fn ping(
-) -> Result<HttpResponse, SecretError> {
-
+async fn ping() -> Result<HttpResponse, SecretError> {
     Ok(HttpResponse::Ok().body("PONG"))
 }
 #[derive(serde::Deserialize)]
@@ -64,7 +62,12 @@ async fn fetch_states(
     parameters: web::Query<FetchStatesParam>,
     db: web::Data<SqlitePool>,
 ) -> Result<HttpResponse, SecretError> {
-    let result = db::fetch_states(&db, parameters.data_type.to_owned(), parameters.last_sync_id.to_owned()).await?;
+    let result = db::fetch_states(
+        &db,
+        parameters.data_type.to_owned(),
+        parameters.last_sync_id.to_owned(),
+    )
+    .await?;
 
     Ok(HttpResponse::Ok().json(result))
 }
@@ -86,7 +89,12 @@ async fn fetch_state(
 async fn main() -> io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    let db_url = std::env::var("SECRET_SERVER_DB_URL").unwrap_or("sqlite://db/secret.db".to_string());
+    let args: Vec<String> = std::env::args().collect();
+    let db_url = if args.len() > 1 {
+        args[1].clone()
+    } else {
+        std::env::var("SECRET_SERVER_DB_URL").unwrap_or("sqlite://db/secret.db".to_string())
+    };
     println!("db_url: {}", db_url);
 
     let pool = SqlitePool::connect(&db_url).await.unwrap();
@@ -98,12 +106,12 @@ async fn main() -> io::Result<()> {
             // store db pool as Data object
             .app_data(web::Data::new(pool.clone()))
             .wrap(middleware::Logger::default())
-            .wrap(  
-                 Cors::default()
+            .wrap(
+                Cors::default()
                     .allow_any_origin()
                     .allow_any_method()
                     .allow_any_header()
-                    .supports_credentials()
+                    .supports_credentials(),
             )
             // .route("/fetch_events", web::get().to(fetch_events))
             .route("/fetch_states", web::get().to(fetch_states))
@@ -111,7 +119,7 @@ async fn main() -> io::Result<()> {
             .route("/push", web::post().to(push_event))
             .route("/ping", web::get().to(ping))
     })
-    .bind(("localhost", 12345))?
+    .bind(("localhost", 12346))?
     .workers(2)
     .run()
     .await
