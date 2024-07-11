@@ -93,8 +93,7 @@ async fn fetch_state(
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
-    let subscriber = log::get_subscriber("app".into(), "info".into());
-    log::init_subscribe(subscriber);
+    let _worker_guard = log::init_subscriber("app".into(), "info".into());
 
     let args: Vec<String> = std::env::args().collect();
     let db_url = if args.len() > 1 {
