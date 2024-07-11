@@ -1,12 +1,15 @@
 use std::io;
 
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpResponse, HttpServer, ResponseError};
+use actix_web::{web, App, HttpResponse, HttpServer, ResponseError};
 use db::Event;
 use reqwest::StatusCode;
 use sqlx::SqlitePool;
+use tracing::info;
+use tracing_actix_web::TracingLogger;
 
 mod db;
+mod log;
 
 pub fn error_chain_fmt(
     e: &impl std::error::Error,
@@ -41,6 +44,7 @@ impl ResponseError for SecretError {
     }
 }
 
+#[tracing::instrument(name = "got event", skip(db))]
 async fn push_event(
     event: web::Json<Event>,
     db: web::Data<SqlitePool>,
@@ -49,9 +53,11 @@ async fn push_event(
 
     Ok(HttpResponse::Ok().json(result))
 }
+
 async fn ping() -> Result<HttpResponse, SecretError> {
     Ok(HttpResponse::Ok().body("PONG"))
 }
+
 #[derive(serde::Deserialize)]
 pub struct FetchStatesParam {
     data_type: String,
@@ -87,7 +93,8 @@ async fn fetch_state(
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    let subscriber = log::get_subscriber("app".into(), "info".into());
+    log::init_subscribe(subscriber);
 
     let args: Vec<String> = std::env::args().collect();
     let db_url = if args.len() > 1 {
@@ -95,7 +102,8 @@ async fn main() -> io::Result<()> {
     } else {
         std::env::var("SECRET_SERVER_DB_URL").unwrap_or("sqlite://db/secret.db".to_string())
     };
-    println!("db_url: {}", db_url);
+
+    info!("db path: {}", db_url);
 
     let pool = SqlitePool::connect(&db_url).await.unwrap();
     // log::info!("starting HTTP server at http://localhost:12345");
@@ -105,7 +113,7 @@ async fn main() -> io::Result<()> {
         App::new()
             // store db pool as Data object
             .app_data(web::Data::new(pool.clone()))
-            .wrap(middleware::Logger::default())
+            .wrap(TracingLogger::default())
             .wrap(
                 Cors::default()
                     .allow_any_origin()

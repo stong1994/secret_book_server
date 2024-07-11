@@ -16,25 +16,32 @@ reqwest = "0.11.24"
 
 # r2d2 = "0.8"
 # r2d2_sqlite = "0.22"
-serde = { version = "1.0.193" , features = ["derive"]}
+serde = { version = "1.0.193", features = ["derive"] }
 thiserror = "1.0.56"
 tokio = "1.35.1"
+tracing-actix-web = "0.7.11"
+tracing = "0.1.40"
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.1"
+[dependencies.tracing-subscriber]
+version = "0.3.18"
+features = ["registry", "env-filter"]
 [dependencies.uuid]
 version = "1.7.0"
 features = [
-    "v4",                # Lets you generate random UUIDs
-    "fast-rng",          # Use a faster (but still sufficiently random) RNG
-    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+  "v4",                # Lets you generate random UUIDs
+  "fast-rng",          # Use a faster (but still sufficiently random) RNG
+  "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ]
 [dependencies.sqlx]
 version = "0.5.7"
 default-features = false
 features = [
-    "runtime-actix-rustls",
-    "macros",
-    "sqlite",
-    "uuid",
-    "chrono",
-    "migrate",
-    "offline"
+  "runtime-actix-rustls",
+  "macros",
+  "sqlite",
+  "uuid",
+  "chrono",
+  "migrate",
+  "offline",
 ]
