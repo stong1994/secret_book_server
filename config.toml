@@ -1,0 +1,7 @@
+[application]
+host = "localhost"
+port = 12346
+base_url = "secret"
+
+[database]
+url = "./db/secret.db"
