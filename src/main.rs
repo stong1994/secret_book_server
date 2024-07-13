@@ -5,9 +5,13 @@ use secret_book_server::{
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _guard = init_subscriber("app".into(), "info".into());
-
     let configuration = get_configuration().expect("Failed to read configuration.");
+
+    let _guard = init_subscriber(
+        "app".into(),
+        configuration.log.level.clone(),
+        configuration.log.dir.clone(),
+    );
 
     let application = Application::build(configuration).expect("Failed to build application");
     application.run_until_stopped().await?;

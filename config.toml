@@ -2,5 +2,9 @@
 host = "localhost"
 port = 12346
 
+[log]
+level = "info"
+dir = "./logs/"
+
 [database]
 url = "./db/secret.db"
