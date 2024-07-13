@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use config::{Config, Environment, File};
-use serde::Deserialize;
 
 #[derive(Clone, serde::Deserialize)]
 pub struct Settings {

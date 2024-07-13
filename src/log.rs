@@ -1,5 +1,5 @@
 use tracing::subscriber::set_global_default;
-use tracing_appender::non_blocking::{self, WorkerGuard};
+use tracing_appender::non_blocking::{WorkerGuard};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 

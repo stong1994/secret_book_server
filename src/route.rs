@@ -1,16 +1,8 @@
-use std::io;
-
-use actix_cors::Cors;
-use actix_web::{web, App, HttpResponse, HttpServer, ResponseError};
+use actix_web::{web, HttpResponse, ResponseError};
 use reqwest::StatusCode;
 use sqlx::SqlitePool;
-use tracing::info;
-use tracing_actix_web::TracingLogger;
 
-use crate::{
-    db::{self, Event},
-    log,
-};
+use crate::db::{self, Event};
 
 pub fn error_chain_fmt(
     e: &impl std::error::Error,
@@ -50,9 +42,9 @@ pub async fn push_event(
     event: web::Json<Event>,
     db: web::Data<SqlitePool>,
 ) -> Result<HttpResponse, SecretError> {
-    let result = db::push_event(&db, event.0).await?;
+    db::push_event(&db, event.0).await?;
 
-    Ok(HttpResponse::Ok().json(result))
+    Ok(HttpResponse::Ok().json(()))
 }
 
 pub async fn ping() -> HttpResponse {

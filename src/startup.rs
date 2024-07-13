@@ -1,7 +1,7 @@
 use std::net::TcpListener;
 
 use actix_cors::Cors;
-use actix_web::{dev::Server, web, App, HttpRequest, HttpServer, Responder};
+use actix_web::{dev::Server, web, App, HttpServer};
 use anyhow::{Context, Result};
 use sqlx::SqlitePool;
 use tracing_actix_web::TracingLogger;
