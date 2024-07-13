@@ -26,7 +26,7 @@ impl Application {
         let port = lst.local_addr().unwrap().port();
         let db_pool = SqlitePool::connect_lazy(&configuration.database.url)
             .context("Failed to create connection pool")?;
-        let server = run(lst, configuration.application.base_url, db_pool)?;
+        let server = run(lst, db_pool)?;
         Ok(Self { port, server })
     }
 
@@ -41,9 +41,8 @@ impl Application {
 
 pub struct ApplicationUrl(pub String);
 
-pub fn run(lst: TcpListener, base_url: String, db_pool: SqlitePool) -> Result<Server> {
+pub fn run(lst: TcpListener, db_pool: SqlitePool) -> Result<Server> {
     let pool = web::Data::new(db_pool);
-    let base_url = web::Data::new(ApplicationUrl(base_url));
 
     let server = HttpServer::new(move || {
         App::new()
@@ -60,7 +59,6 @@ pub fn run(lst: TcpListener, base_url: String, db_pool: SqlitePool) -> Result<Se
             .route("/push", web::post().to(push_event))
             .route("/ping", web::get().to(ping))
             .app_data(pool.clone())
-            .app_data(base_url.clone())
     })
     .listen(lst)?
     .run();
